@@ -5,6 +5,10 @@ import os
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
+import urllib.parse
+AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".ogg")
+MUSIC_DIR = "/home/matt/music"
 
 app = Flask(__name__)
 
@@ -23,6 +27,8 @@ DEFAULT_CONFIG = {
     "weekday_time": "07:00",
     "weekend_time": "08:00",
     "station": "kutx",
+    "alarm_source": "station",
+    "alarm_file": "",
     "last_alarm_date": ""
 }
 
@@ -49,8 +55,21 @@ def run(cmd):
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         save_config(DEFAULT_CONFIG)
+
     with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+        config = json.load(f)
+
+    # Add any new missing config keys without destroying existing settings
+    changed = False
+    for key, value in DEFAULT_CONFIG.items():
+        if key not in config:
+            config[key] = value
+            changed = True
+
+    if changed:
+        save_config(config)
+
+    return config
 
 def save_config(config):
     with open(CONFIG_FILE, "w") as f:
@@ -61,6 +80,19 @@ def play_station(station):
     if url:
         run("/usr/bin/pkill -f vlc")
         run(f"/usr/bin/cvlc --no-video '{url}' >> /tmp/pi-radio.log 2>&1 &")
+
+def play_alarm(config):
+    run("/usr/bin/pkill -f vlc")
+
+    if config.get("alarm_source") == "file" and config.get("alarm_file"):
+        music_path = Path(MUSIC_DIR).resolve()
+        full_path = (music_path / config["alarm_file"]).resolve()
+
+        if str(full_path).startswith(str(music_path)) and full_path.exists():
+            run(f'/usr/bin/cvlc --no-video "{full_path}" >> /tmp/pi-radio.log 2>&1 &')
+            return
+
+    play_station(config.get("station", "kutx"))
 
 def alarm_loop():
     while True:
@@ -73,11 +105,24 @@ def alarm_loop():
             alarm_time = config["weekend_time"] if is_weekend else config["weekday_time"]
 
             if now.strftime("%H:%M") == alarm_time:
-                play_station(config["station"])
+                play_alarm(config)
                 config["last_alarm_date"] = today
                 save_config(config)
 
         time.sleep(30)
+
+def get_music_files():
+    music_path = Path(MUSIC_DIR)
+    if not music_path.exists():
+        return []
+
+    files = []
+    for path in music_path.rglob("*"):
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS:
+            rel = path.relative_to(music_path)
+            files.append(str(rel))
+
+    return sorted(files)
 
 @app.route("/")
 def index():
@@ -88,6 +133,20 @@ def index():
     alarm_status = "Enabled" if config["alarm_enabled"] else "Disabled"
 
     stream_buttons = ""
+
+    music_files = get_music_files()
+
+    music_list = ""
+    for file in music_files:
+        encoded = urllib.parse.quote(file)
+        music_list += f'''
+        <li>
+            {file}
+            - <a href="/play-file?file={encoded}">Play</a>
+            - <a href="/set-alarm-file?file={encoded}">Use for Alarm</a>
+        </li>
+        '''
+
     for name in STREAMS:
         stream_buttons += f'<a href="/play/{name}"><button>{name.upper()}</button></a>'
 
@@ -133,12 +192,23 @@ def index():
         <p>Alarm: <b>{alarm_status}</b></p>
         <p>Weekday Alarm: <b>{config["weekday_time"]}</b></p>
         <p>Weekend Alarm: <b>{config["weekend_time"]}</b></p>
+        <p>Alarm Source: <b>{config.get("alarm_source", "station")}</b></p>
         <p>Alarm Station: <b>{config["station"].upper()}</b></p>
+        <p>Alarm File: <b>{config.get("alarm_file", "")}</b></p>
         <p>Volume: <b>{volume}%</b></p>
       </div>
 
       <h2>Streams</h2>
       {stream_buttons}
+      
+      <h2>Music Files</h2>
+      <ul style="list-style: none; padding: 0;">
+      {music_list}
+      </ul>
+
+      <p>
+        <a href="/set-alarm-station"><button>Use Station for Alarm</button></a>
+      </p>
 
       <h2>Volume</h2>
       <a href="/vol/down"><button>Vol -</button></a>
@@ -200,7 +270,7 @@ def alarm_on():
 @app.route("/alarm/off")
 def alarm_off():
     config = load_config()
-    config["alarm_enabled"] = True
+    config["alarm_enabled"] = False
     config["last_alarm_date"] = ""
     save_config(config)
     return redirect("/")
@@ -212,6 +282,45 @@ def alarm_set():
     config["weekend_time"] = request.form["weekend_time"]
     config["last_alarm_date"] = ""
     save_config(config)
+    return redirect("/")
+
+@app.route("/play-file")
+def play_file():
+    rel_file = request.args.get("file", "")
+
+    music_path = Path(MUSIC_DIR).resolve()
+    full_path = (music_path / rel_file).resolve()
+
+    if not str(full_path).startswith(str(music_path)):
+        return "Invalid file path", 400
+
+    if not full_path.exists():
+        return "File not found", 404
+
+    run("/usr/bin/pkill -f vlc")
+    run(f'/usr/bin/cvlc --no-video "{full_path}" >> /tmp/pi-radio.log 2>&1 &')
+
+    return redirect("/")
+
+@app.route("/set-alarm-file")
+def set_alarm_file():
+    rel_file = request.args.get("file", "")
+
+    config = load_config()
+    config["alarm_source"] = "file"
+    config["alarm_file"] = rel_file
+    config["last_alarm_date"] = ""
+    save_config(config)
+
+    return redirect("/")
+
+@app.route("/set-alarm-station")
+def set_alarm_station():
+    config = load_config()
+    config["alarm_source"] = "station"
+    config["last_alarm_date"] = ""
+    save_config(config)
+
     return redirect("/")
 
 if __name__ == "__main__":
