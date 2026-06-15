@@ -1,7 +1,9 @@
 {
-  "alarm_enabled": true,
-  "weekday_time": "04:30",
+  "alarm_enabled": false,
+  "weekday_time": "07:00",
   "weekend_time": "08:00",
   "station": "kutx",
-  "last_alarm_date": "2026-06-10"
+  "alarm_source": "station",
+  "alarm_file": "",
+  "last_alarm_date": ""
 }
