@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import urllib.parse
+
 AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".ogg")
 MUSIC_DIR = "/home/matt/music"
 
@@ -40,9 +41,6 @@ def get_volume():
             text=True
         ).strip()
 
-        # Example output:
-        # Volume: 0.44
-
         volume = float(result.split()[1])
         return int(volume * 100)
 
@@ -59,7 +57,6 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         config = json.load(f)
 
-    # Add any new missing config keys without destroying existing settings
     changed = False
     for key, value in DEFAULT_CONFIG.items():
         if key not in config:
@@ -127,12 +124,13 @@ def get_music_files():
 @app.route("/")
 def index():
     config = load_config()
-    
-    volume = get_volume()    
+    volume = get_volume()
 
     alarm_status = "Enabled" if config["alarm_enabled"] else "Disabled"
 
     stream_buttons = ""
+    for name in STREAMS:
+        stream_buttons += f'<a href="/play/{urllib.parse.quote(name)}"><button>{name.upper()}</button></a>'
 
     music_files = get_music_files()
 
@@ -140,15 +138,16 @@ def index():
     for file in music_files:
         encoded = urllib.parse.quote(file)
         music_list += f'''
-        <li>
-            {file}
-            - <a href="/play-file?file={encoded}">Play</a>
-            - <a href="/set-alarm-file?file={encoded}">Use for Alarm</a>
+        <li class="music-item">
+            <span class="music-name">🎵 {file}</span>
+            <a href="/play-file?file={encoded}">
+                <button class="small-button">Play</button>
+            </a>
+            <a href="/set-alarm-file?file={encoded}">
+                <button class="small-button">Alarm</button>
+            </a>
         </li>
         '''
-
-    for name in STREAMS:
-        stream_buttons += f'<a href="/play/{name}"><button>{name.upper()}</button></a>'
 
     return f"""
     <html>
@@ -162,17 +161,27 @@ def index():
           color: white;
           padding-top: 30px;
         }}
+
         button {{
           font-size: 22px;
           padding: 18px 30px;
           margin: 8px;
           border-radius: 12px;
         }}
+
+        .small-button {{
+          font-size: 16px;
+          padding: 8px 14px;
+          margin: 4px;
+          border-radius: 8px;
+        }}
+
         input {{
           font-size: 22px;
           padding: 10px;
           margin: 8px;
         }}
+
         .status {{
           background: #222;
           display: inline-block;
@@ -180,35 +189,60 @@ def index():
           border-radius: 14px;
           margin-bottom: 20px;
         }}
+
+        details {{
+          background: #181818;
+          margin: 35px auto;
+          padding: 20px;
+          border-radius: 14px;
+          max-width: 900px;
+        }}
+
+        summary {{
+          cursor: pointer;
+          font-size: 26px;
+          font-weight: bold;
+          margin-bottom: 15px;
+        }}
+
+        .music-list {{
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }}
+
+        .music-item {{
+          background: #222;
+          margin: 10px auto;
+          padding: 12px;
+          border-radius: 10px;
+          max-width: 800px;
+        }}
+
+        .music-name {{
+          display: block;
+          margin-bottom: 8px;
+          word-break: break-word;
+        }}
       </style>
     </head>
 
     <body>
       <h1>Bedroom Pi Radio</h1>
 
-      <!-- HTML CODE TO ADD TO THE TOP -->
       <div class="status">
         <h2>Status</h2>
+        <p>Volume: <b>{volume}%</b></p>
         <p>Alarm: <b>{alarm_status}</b></p>
         <p>Weekday Alarm: <b>{config["weekday_time"]}</b></p>
         <p>Weekend Alarm: <b>{config["weekend_time"]}</b></p>
         <p>Alarm Source: <b>{config.get("alarm_source", "station")}</b></p>
         <p>Alarm Station: <b>{config["station"].upper()}</b></p>
         <p>Alarm File: <b>{config.get("alarm_file", "")}</b></p>
-        <p>Volume: <b>{volume}%</b></p>
       </div>
 
       <h2>Streams</h2>
       {stream_buttons}
-      
-      <h2>Music Files</h2>
-      <ul style="list-style: none; padding: 0;">
-      {music_list}
-      </ul>
-
-      <p>
-        <a href="/set-alarm-station"><button>Use Station for Alarm</button></a>
-      </p>
 
       <h2>Volume</h2>
       <a href="/vol/down"><button>Vol -</button></a>
@@ -231,6 +265,21 @@ def index():
           <button type="submit">Save Alarm Times</button>
         </p>
       </form>
+
+      <p>
+        <a href="/set-alarm-station">
+          <button>Use Station for Alarm</button>
+        </a>
+      </p>
+
+      <details>
+        <summary>Music Library</summary>
+
+        <ul class="music-list">
+          {music_list}
+        </ul>
+      </details>
+
     </body>
     </html>
     """
@@ -264,6 +313,7 @@ def mute():
 def alarm_on():
     config = load_config()
     config["alarm_enabled"] = True
+    config["last_alarm_date"] = ""
     save_config(config)
     return redirect("/")
 
@@ -326,3 +376,4 @@ def set_alarm_station():
 if __name__ == "__main__":
     threading.Thread(target=alarm_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
+    
