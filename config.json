@@ -5,5 +5,9 @@
   "station": "kutx",
   "alarm_source": "station",
   "alarm_file": "",
-  "last_alarm_date": ""
+  "last_alarm_date": "",
+  "speaker_a_name": "Soundcore-Main",
+  "speaker_a_mac": "F4:2B:7D:46:69:B8",
+  "speaker_b_name": "Soundcore-B",
+  "speaker_b_mac": "F4:4E:FC:41:C5:3B"
 }
