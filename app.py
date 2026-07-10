@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 import urllib.parse
+import socket
+HOSTNAME = socket.gethostname()
 
 AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".ogg")
 MUSIC_DIR = "/home/matt/music"
@@ -21,6 +23,9 @@ STREAMS = {
     "GDRadio.net": "https://ssl.rockhost.com/proxy/gdradiov2?mp=/stream",
     "BBC World Service": "https://streams.kut.org/4427/playlist.m3u8",
     "KUT": "https://streams.kut.org/4426_56?aw_0_1st.playerid=kut-free",
+    "AIR Raagam" : "https://air.pc.cdn.bitgravity.com/air/live/pbaudio044/chunklist.m3u8",
+    "indianlinkradio" : "https://indianlink1.radioca.st/;",
+    "Radio Caprice - indian folk" : "http://79.111.14.76:8000/indianfolk",
 }
 
 DEFAULT_CONFIG = {
@@ -30,7 +35,11 @@ DEFAULT_CONFIG = {
     "station": "kutx",
     "alarm_source": "station",
     "alarm_file": "",
-    "last_alarm_date": ""
+    "last_alarm_date": "",
+    "speaker_a_name": "Speaker A",
+    "speaker_a_mac": "",
+    "speaker_b_name": "Speaker B",
+    "speaker_b_mac": ""
 }
 
 def get_volume():
@@ -121,10 +130,54 @@ def get_music_files():
 
     return sorted(files)
 
+def bluetooth_connect(mac_address):
+    if not mac_address:
+        return False
+
+    result = subprocess.run(
+        ["/usr/bin/bluetoothctl", "connect", mac_address],
+        capture_output=True,
+        text=True,
+        timeout=20
+    )
+
+    output = result.stdout + result.stderr
+    return result.returncode == 0 or "Connection successful" in output
+
+
+def bluetooth_disconnect(mac_address):
+    if not mac_address:
+        return
+
+    subprocess.run(
+        ["/usr/bin/bluetoothctl", "disconnect", mac_address],
+        capture_output=True,
+        text=True,
+        timeout=10
+    )
+
+
+def connect_speaker(speaker_key):
+    config = load_config()
+
+    selected_mac = config.get(f"{speaker_key}_mac", "")
+    other_key = "speaker_b" if speaker_key == "speaker_a" else "speaker_a"
+    other_mac = config.get(f"{other_key}_mac", "")
+
+    # Disconnect the old possible master first
+    bluetooth_disconnect(other_mac)
+
+    time.sleep(1)
+
+    return bluetooth_connect(selected_mac)
+
 @app.route("/")
 def index():
     config = load_config()
     volume = get_volume()
+
+    speaker_a_name = config.get("speaker_a_name", "Speaker A")
+    speaker_b_name = config.get("speaker_b_name", "Speaker B")
 
     alarm_status = "Enabled" if config["alarm_enabled"] else "Disabled"
 
@@ -152,7 +205,7 @@ def index():
     return f"""
     <html>
     <head>
-      <title>Bedroom Pi Radio</title>
+      <title>{HOSTNAME.title()} Pi Radio</title>
       <style>
         body {{
           font-family: sans-serif;
@@ -228,7 +281,7 @@ def index():
     </head>
 
     <body>
-      <h1>Bedroom Pi Radio</h1>
+      <h1>{HOSTNAME.title()} Pi Radio</h1>
 
       <div class="status">
         <h2>Status</h2>
@@ -249,6 +302,16 @@ def index():
       <a href="/vol/up"><button>Vol +</button></a>
       <a href="/mute"><button>Mute</button></a>
       <a href="/stop"><button>Stop</button></a>
+
+      <h2>Bluetooth Speakers</h2>
+
+      <a href="/bluetooth/connect/speaker_a">
+        <button>Connect {speaker_a_name}</button>
+      </a>
+
+      <a href="/bluetooth/connect/speaker_b">
+        <button>Connect {speaker_b_name}</button>
+      </a>
 
       <h2>Alarm</h2>
       <a href="/alarm/on"><button>Enable Alarm</button></a>
@@ -341,7 +404,7 @@ def play_file():
     music_path = Path(MUSIC_DIR).resolve()
     full_path = (music_path / rel_file).resolve()
 
-    if not str(full_path).startswith(str(music_path)):
+    if not full_path.is_relative_to(music_path):
         return "Invalid file path", 400
 
     if not full_path.exists():
@@ -370,6 +433,18 @@ def set_alarm_station():
     config["alarm_source"] = "station"
     config["last_alarm_date"] = ""
     save_config(config)
+
+    return redirect("/")
+
+@app.route("/bluetooth/connect/<speaker_key>")
+def connect_bluetooth_speaker(speaker_key):
+    if speaker_key not in ("speaker_a", "speaker_b"):
+        return "Invalid speaker", 400
+
+    success = connect_speaker(speaker_key)
+
+    if not success:
+        return f"Unable to connect {speaker_key}", 500
 
     return redirect("/")
 
