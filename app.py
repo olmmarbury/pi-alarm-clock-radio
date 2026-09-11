@@ -26,6 +26,17 @@ STREAMS = {
     "AIR Raagam" : "https://air.pc.cdn.bitgravity.com/air/live/pbaudio044/chunklist.m3u8",
     "indianlinkradio" : "https://indianlink1.radioca.st/;",
     "Radio Caprice - indian folk" : "http://79.111.14.76:8000/indianfolk",
+    "Beatles Radio": "http://www.beatlesradio.com:8000/stream/1/",
+    "Beatles-A-Rama": "https://stream.radio.co/se13369565/listen",
+    "Exclusively The Beatles": "https://streaming.exclusive.radio/er/beatles/icecast.audio",
+    "The Beatles (Dedicated Beatles stream)": "https://sp0.wlservices.org:9996/stream",
+    "Exclusively Led Zeppelin — full catalog": "https://streaming.exclusive.radio/er-app/ledzeppelin/icecast.audio",
+    "Exclusively Led Zeppelin – Only Hits": "https://streaming.exclusive.radio/er-app/ledzeppelinhits/icecast.audio",
+    "181.FM — The Eagle (Classic Rock)" : "https://listen.181fm.com/181-eagle_128k.mp3?utm_source=chatgpt.com",
+    "BAGeL Radio" : "https://ais-sa3.cdnstream1.com/2606_128.mp3?utm_source=chatgpt.com",
+    "SomaFM — Underground 80s" : "https://ice5.somafm.com/u80s-128-mp3?utm_source=chatgpt.com",
+    "Punkrockers Radio" : "https://stream.punkrockers-radio.de:8443/prr.flac?utm_source=chatgpt.com",
+    "WFMU" : "http://stream0.wfmu.org/freeform-128k.mp3?utm_source=chatgpt.com",
 }
 
 DEFAULT_CONFIG = {
@@ -39,7 +50,9 @@ DEFAULT_CONFIG = {
     "speaker_a_name": "Speaker A",
     "speaker_a_mac": "",
     "speaker_b_name": "Speaker B",
-    "speaker_b_mac": ""
+    "speaker_b_mac": "",
+    "current_source": "",
+    "current_title": ""
 }
 
 def get_volume():
@@ -55,6 +68,13 @@ def get_volume():
 
     except Exception:
         return "Unknown"
+    
+def vlc_is_running():
+    result = subprocess.run(
+        ["/usr/bin/pgrep", "-f", "vlc"],
+        capture_output=True
+    )
+    return result.returncode == 0
 
 def run(cmd):
     subprocess.run(cmd, shell=True)
@@ -83,9 +103,15 @@ def save_config(config):
 
 def play_station(station):
     url = STREAMS.get(station)
+
     if url:
         run("/usr/bin/pkill -f vlc")
         run(f"/usr/bin/cvlc --no-video '{url}' >> /tmp/pi-radio.log 2>&1 &")
+
+        config = load_config()
+        config["current_source"] = "stream"
+        config["current_title"] = station
+        save_config(config)
 
 def play_alarm(config):
     run("/usr/bin/pkill -f vlc")
@@ -176,6 +202,19 @@ def index():
     config = load_config()
     volume = get_volume()
 
+    if vlc_is_running():
+        current_source = config.get("current_source", "")
+        current_title = config.get("current_title", "")
+
+        if current_source == "stream":
+            now_playing = f"📻 {current_title}"
+        elif current_source == "file":
+            now_playing = f"🎵 {current_title}"
+        else:
+            now_playing = "Playing"
+    else:
+        now_playing = "Nothing Playing"
+
     speaker_a_name = config.get("speaker_a_name", "Speaker A")
     speaker_b_name = config.get("speaker_b_name", "Speaker B")
 
@@ -213,6 +252,14 @@ def index():
           background: #111;
           color: white;
           padding-top: 30px;
+        }}
+
+        .now-playing {{
+            font-size: 24px;
+            background: #333;
+            padding: 12px 18px;
+            border-radius: 10px;
+            margin-bottom: 18px;
         }}
 
         button {{
@@ -283,8 +330,13 @@ def index():
     <body>
       <h1>{HOSTNAME.title()} Pi Radio</h1>
 
-      <div class="status">
+        <div class="status">
         <h2>Status</h2>
+
+        <p class="now-playing">
+            Now Playing: <b>{now_playing}</b>
+        </p>
+
         <p>Volume: <b>{volume}%</b></p>
         <p>Alarm: <b>{alarm_status}</b></p>
         <p>Weekday Alarm: <b>{config["weekday_time"]}</b></p>
@@ -292,7 +344,7 @@ def index():
         <p>Alarm Source: <b>{config.get("alarm_source", "station")}</b></p>
         <p>Alarm Station: <b>{config["station"].upper()}</b></p>
         <p>Alarm File: <b>{config.get("alarm_file", "")}</b></p>
-      </div>
+        </div>
 
       <h2>Streams</h2>
       {stream_buttons}
@@ -355,6 +407,12 @@ def play(station):
 @app.route("/stop")
 def stop():
     run("/usr/bin/pkill -f vlc")
+
+    config = load_config()
+    config["current_source"] = ""
+    config["current_title"] = ""
+    save_config(config)
+
     return redirect("/")
 
 @app.route("/vol/up")
@@ -412,6 +470,11 @@ def play_file():
 
     run("/usr/bin/pkill -f vlc")
     run(f'/usr/bin/cvlc --no-video "{full_path}" >> /tmp/pi-radio.log 2>&1 &')
+
+    config = load_config()
+    config["current_source"] = "file"
+    config["current_title"] = rel_file
+    save_config(config)
 
     return redirect("/")
 
