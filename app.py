@@ -138,6 +138,7 @@ def alarm_loop():
 
             if now.strftime("%H:%M") == alarm_time:
                 play_alarm(config)
+                config = load_config()
                 config["last_alarm_date"] = today
                 save_config(config)
 
