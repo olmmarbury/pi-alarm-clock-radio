@@ -523,6 +523,29 @@ def connect_bluetooth_speaker(speaker_key):
 
     return redirect("/")
 
+@app.route("/system/restart-radio", methods=["POST"])
+def restart_radio():
+    subprocess.Popen(
+        ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+         "restart", "pi-radio.service"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    return "Pi Radio is restarting. Refresh the page in a few seconds."
+
+
+@app.route("/system/reboot", methods=["POST"])
+def reboot_pi():
+    subprocess.Popen(
+        ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+         "reboot"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    return "Raspberry Pi is rebooting. Reconnect in a minute or two."
+
 if __name__ == "__main__":
     threading.Thread(target=alarm_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=8080)
