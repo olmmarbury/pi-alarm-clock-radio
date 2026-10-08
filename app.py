@@ -122,9 +122,15 @@ def play_alarm(config):
 
         if str(full_path).startswith(str(music_path)) and full_path.exists():
             run(f'/usr/bin/cvlc --no-video "{full_path}" >> /tmp/pi-radio.log 2>&1 &')
+            config["current_source"] = "file"
+            config["current_title"] = config["alarm_file"]
             return
 
-    play_station(config.get("station", "kutx"))
+    station = config.get("station", "kutx")
+    play_station(station)
+    if station in STREAMS:
+        config["current_source"] = "stream"
+        config["current_title"] = station
 
 def alarm_loop():
     while True:
