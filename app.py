@@ -349,46 +349,58 @@ def index():
         <p>Alarm File: <b>{config.get("alarm_file", "")}</b></p>
         </div>
 
-      <h2>Streams</h2>
-      {stream_buttons}
+        <h2>Streams</h2>
+        {stream_buttons}
 
-      <h2>Volume</h2>
-      <a href="/vol/down"><button>Vol -</button></a>
-      <a href="/vol/up"><button>Vol +</button></a>
-      <a href="/mute"><button>Mute</button></a>
-      <a href="/stop"><button>Stop</button></a>
+        <h2>Volume</h2>
+        <a href="/vol/down"><button>Vol -</button></a>
+        <a href="/vol/up"><button>Vol +</button></a>
+        <a href="/mute"><button>Mute</button></a>
+        <a href="/stop"><button>Stop</button></a>
 
-      <h2>Bluetooth Speakers</h2>
+        <h2>Bluetooth Speakers</h2>
 
-      <a href="/bluetooth/connect/speaker_a">
-        <button>Connect {speaker_a_name}</button>
-      </a>
+        <a href="/bluetooth/connect/speaker_a">
+            <button>Connect {speaker_a_name}</button>
+        </a>
 
-      <a href="/bluetooth/connect/speaker_b">
-        <button>Connect {speaker_b_name}</button>
-      </a>
+        <a href="/bluetooth/connect/speaker_b">
+            <button>Connect {speaker_b_name}</button>
+        </a>
 
-      <h2>Alarm</h2>
-      <a href="/alarm/on"><button>Enable Alarm</button></a>
-      <a href="/alarm/off"><button>Disable Alarm</button></a>
+        <h2>Alarm</h2>
+        <a href="/alarm/on"><button>Enable Alarm</button></a>
+        <a href="/alarm/off"><button>Disable Alarm</button></a>
 
-      <form action="/alarm/set" method="post">
-        <p>Weekday Time</p>
-        <input type="time" name="weekday_time" value="{config["weekday_time"]}">
+        <form action="/alarm/set" method="post">
+            <p>Weekday Time</p>
+            <input type="time" name="weekday_time" value="{config["weekday_time"]}">
 
-        <p>Weekend Time</p>
-        <input type="time" name="weekend_time" value="{config["weekend_time"]}">
+            <p>Weekend Time</p>
+            <input type="time" name="weekend_time" value="{config["weekend_time"]}">
+
+            <p>
+            <button type="submit">Save Alarm Times</button>
+            </p>
+        </form>
 
         <p>
-          <button type="submit">Save Alarm Times</button>
+            <a href="/set-alarm-station">
+            <button>Use Station for Alarm</button>
+            </a>
         </p>
-      </form>
 
-      <p>
-        <a href="/set-alarm-station">
-          <button>Use Station for Alarm</button>
-        </a>
-      </p>
+        <h2>System Controls</h2>
+
+        <form action="/system/restart-radio" method="post"
+            onsubmit="return confirm('Restart Pi Radio service?');">
+            <button type="submit">🔄 Restart Pi Radio</button>
+        </form>
+
+        <form action="/system/reboot" method="post"
+            onsubmit="return confirm('Reboot the entire Raspberry Pi?');">
+            <button type="submit">⏻ Reboot Raspberry Pi</button>
+        </form>
 
       <details>
         <summary>Music Library</summary>
@@ -513,6 +525,29 @@ def connect_bluetooth_speaker(speaker_key):
         return f"Unable to connect {speaker_key}", 500
 
     return redirect("/")
+
+@app.route("/system/restart-radio", methods=["POST"])
+def restart_radio():
+    subprocess.Popen(
+        ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+         "restart", "pi-radio.service"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    return "Pi Radio is restarting. Refresh the page in a few seconds."
+
+
+@app.route("/system/reboot", methods=["POST"])
+def reboot_pi():
+    subprocess.Popen(
+        ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+         "reboot"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+    return "Raspberry Pi is rebooting. Reconnect in a minute or two."
 
 if __name__ == "__main__":
     threading.Thread(target=alarm_loop, daemon=True).start()
