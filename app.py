@@ -346,46 +346,58 @@ def index():
         <p>Alarm File: <b>{config.get("alarm_file", "")}</b></p>
         </div>
 
-      <h2>Streams</h2>
-      {stream_buttons}
+        <h2>Streams</h2>
+        {stream_buttons}
 
-      <h2>Volume</h2>
-      <a href="/vol/down"><button>Vol -</button></a>
-      <a href="/vol/up"><button>Vol +</button></a>
-      <a href="/mute"><button>Mute</button></a>
-      <a href="/stop"><button>Stop</button></a>
+        <h2>Volume</h2>
+        <a href="/vol/down"><button>Vol -</button></a>
+        <a href="/vol/up"><button>Vol +</button></a>
+        <a href="/mute"><button>Mute</button></a>
+        <a href="/stop"><button>Stop</button></a>
 
-      <h2>Bluetooth Speakers</h2>
+        <h2>Bluetooth Speakers</h2>
 
-      <a href="/bluetooth/connect/speaker_a">
-        <button>Connect {speaker_a_name}</button>
-      </a>
+        <a href="/bluetooth/connect/speaker_a">
+            <button>Connect {speaker_a_name}</button>
+        </a>
 
-      <a href="/bluetooth/connect/speaker_b">
-        <button>Connect {speaker_b_name}</button>
-      </a>
+        <a href="/bluetooth/connect/speaker_b">
+            <button>Connect {speaker_b_name}</button>
+        </a>
 
-      <h2>Alarm</h2>
-      <a href="/alarm/on"><button>Enable Alarm</button></a>
-      <a href="/alarm/off"><button>Disable Alarm</button></a>
+        <h2>Alarm</h2>
+        <a href="/alarm/on"><button>Enable Alarm</button></a>
+        <a href="/alarm/off"><button>Disable Alarm</button></a>
 
-      <form action="/alarm/set" method="post">
-        <p>Weekday Time</p>
-        <input type="time" name="weekday_time" value="{config["weekday_time"]}">
+        <form action="/alarm/set" method="post">
+            <p>Weekday Time</p>
+            <input type="time" name="weekday_time" value="{config["weekday_time"]}">
 
-        <p>Weekend Time</p>
-        <input type="time" name="weekend_time" value="{config["weekend_time"]}">
+            <p>Weekend Time</p>
+            <input type="time" name="weekend_time" value="{config["weekend_time"]}">
+
+            <p>
+            <button type="submit">Save Alarm Times</button>
+            </p>
+        </form>
 
         <p>
-          <button type="submit">Save Alarm Times</button>
+            <a href="/set-alarm-station">
+            <button>Use Station for Alarm</button>
+            </a>
         </p>
-      </form>
 
-      <p>
-        <a href="/set-alarm-station">
-          <button>Use Station for Alarm</button>
-        </a>
-      </p>
+        <h2>System Controls</h2>
+
+        <form action="/system/restart-radio" method="post"
+            onsubmit="return confirm('Restart Pi Radio service?');">
+            <button type="submit">🔄 Restart Pi Radio</button>
+        </form>
+
+        <form action="/system/reboot" method="post"
+            onsubmit="return confirm('Reboot the entire Raspberry Pi?');">
+            <button type="submit">⏻ Reboot Raspberry Pi</button>
+        </form>
 
       <details>
         <summary>Music Library</summary>
